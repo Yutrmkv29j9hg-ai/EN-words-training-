@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>英単語トレーニング</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --primary: #4F46E5;
+      --primary-light: #818CF8;
+      --success: #10B981;
+      --danger: #EF4444;
+      --warning: #F59E0B;
+      --bg: #F1F5F9;
+      --card: #FFFFFF;
+      --text: #1E293B;
+      --muted: #64748B;
+      --border: #E2E8F0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(0,0,0,.2);
+    }
+    header h1 { font-size: 1.15rem; font-weight: 700; }
+    .badge {
+      background: rgba(255,255,255,.2);
+      padding: .25rem .75rem;
+      border-radius: 999px;
+      font-size: .8rem;
+    }
+
+    /* ── Nav ── */
+    nav {
+      display: flex;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+    }
+    nav button {
+      flex: 1;
+      padding: .8rem .25rem;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: .8rem;
+      color: var(--muted);
+      border-bottom: 2px solid transparent;
+      transition: all .2s;
+    }
+    nav button.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+
+    /* ── Main ── */
+    main { padding: 1.25rem; max-width: 560px; margin: 0 auto; }
+
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: .7rem 1.25rem;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: .875rem;
+      font-weight: 600;
+      transition: all .15s;
+    }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+    .btn:active { transform: translateY(0); }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-secondary { background: var(--border); color: var(--text); }
+    .btn-success { background: #D1FAE5; color: var(--success); }
+    .btn-danger  { background: #FEE2E2; color: var(--danger); }
+    .btn-icon { padding: .7rem; min-width: 42px; }
+
+    /* ── Progress bar ── */
+    .prog-wrap { background: var(--border); height: 6px; border-radius: 999px; overflow: hidden; margin-bottom: 1rem; }
+    .prog-bar { height: 100%; background: linear-gradient(90deg, var(--primary), var(--primary-light)); border-radius: 999px; transition: width .3s; }
+
+    /* ── Flashcard ── */
+    .fc-toolbar {
+      display: flex;
+      gap: .5rem;
+      margin-bottom: .75rem;
+      align-items: center;
+    }
+    .fc-toolbar select {
+      flex: 1;
+      padding: .45rem .6rem;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      font-size: .8rem;
+      cursor: pointer;
+      outline: none;
+    }
+    .fc-toolbar select:focus { border-color: var(--primary); }
+
+    .fc-counter { text-align: center; font-size: .8rem; color: var(--muted); margin-bottom: .75rem; }
+
+    .fc-wrap { perspective: 1200px; max-width: 400px; margin: 0 auto 1.25rem; }
+
+    .flashcard {
+      width: 100%;
+      aspect-ratio: 16/10;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform .55s cubic-bezier(.4,0,.2,1);
+      cursor: pointer;
+    }
+    .flashcard.flipped { transform: rotateY(180deg); }
+
+    .fc-face {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .fc-front {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: #fff;
+      box-shadow: 0 8px 24px rgba(79,70,229,.3);
+    }
+    .fc-back {
+      background: #fff;
+      border: 2px solid var(--border);
+      box-shadow: 0 4px 16px rgba(0,0,0,.08);
+      transform: rotateY(180deg);
+    }
+
+    .fc-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; opacity: .7; margin-bottom: .4rem; }
+    .fc-word { font-size: 2rem; font-weight: 700; text-align: center; }
+    .fc-meaning { font-size: 1.5rem; font-weight: 700; text-align: center; margin-bottom: .5rem; }
+    .fc-cat { font-size: .72rem; color: var(--muted); background: var(--bg); padding: .2rem .6rem; border-radius: 999px; }
+    .fc-tap { font-size: .8rem; opacity: .7; margin-top: .75rem; }
+
+    .fc-nav { display: flex; justify-content: center; gap: .75rem; margin-bottom: .75rem; }
+    .fc-actions { display: flex; justify-content: center; gap: 1rem; }
+
+    /* ── Quiz ── */
+    .quiz-scores {
+      display: flex;
+      gap: .75rem;
+      margin-bottom: 1rem;
+    }
+    .score-box {
+      flex: 1;
+      background: #fff;
+      border-radius: 10px;
+      padding: .75rem;
+      text-align: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .score-num { font-size: 1.5rem; font-weight: 700; }
+    .score-lbl { font-size: .7rem; color: var(--muted); }
+
+    .quiz-q {
+      background: #fff;
+      border-radius: 14px;
+      padding: 1.5rem;
+      text-align: center;
+      margin-bottom: 1rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+    .quiz-hint { font-size: .8rem; color: var(--muted); margin-bottom: .4rem; }
+    .quiz-word { font-size: 2rem; font-weight: 700; color: var(--primary); }
+
+    .quiz-opts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .6rem;
+      margin-bottom: 1rem;
+    }
+    .quiz-opt {
+      background: #fff;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: .9rem .5rem;
+      cursor: pointer;
+      font-size: .9rem;
+      text-align: center;
+      transition: all .15s;
+      line-height: 1.3;
+    }
+    .quiz-opt:hover:not(.disabled) { border-color: var(--primary); background: #EEF2FF; }
+    .quiz-opt.correct { border-color: var(--success); background: #D1FAE5; color: var(--success); font-weight: 600; }
+    .quiz-opt.wrong   { border-color: var(--danger);  background: #FEE2E2; color: var(--danger);  font-weight: 600; }
+    .quiz-opt.disabled { cursor: default; }
+
+    .quiz-prog-lbl { text-align: right; font-size: .75rem; color: var(--muted); margin-bottom: .25rem; }
+
+    .result-panel {
+      display: none;
+      background: #fff;
+      border-radius: 16px;
+      padding: 2rem;
+      text-align: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,.08);
+    }
+    .result-panel.show { display: block; }
+    .result-emoji { font-size: 3rem; margin-bottom: .75rem; }
+    .result-title { font-size: 1.5rem; font-weight: 700; margin-bottom: .4rem; }
+    .result-sub { color: var(--muted); font-size: .9rem; margin-bottom: 1.25rem; }
+
+    /* ── Word List ── */
+    .search-wrap { position: relative; margin-bottom: .75rem; }
+    .search-wrap input {
+      width: 100%;
+      padding: .7rem 1rem .7rem 2.25rem;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      font-size: .875rem;
+      background: #fff;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .search-wrap input:focus { border-color: var(--primary); }
+    .search-icon { position: absolute; left: .7rem; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: .9rem; }
+
+    .cat-chips { display: flex; gap: .4rem; overflow-x: auto; margin-bottom: .75rem; padding-bottom: .1rem; }
+    .chip {
+      padding: .3rem .75rem;
+      border-radius: 999px;
+      border: 2px solid var(--border);
+      background: #fff;
+      font-size: .75rem;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all .15s;
+    }
+    .chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    .word-list { display: flex; flex-direction: column; gap: .4rem; }
+    .word-item {
+      background: #fff;
+      border-radius: 10px;
+      padding: .75rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot.known { background: var(--success); }
+    .dot.unknown { background: var(--border); }
+    .word-en { font-weight: 600; flex: 1; }
+    .word-ja { color: var(--muted); font-size: .875rem; }
+    .word-tag { font-size: .68rem; background: var(--bg); padding: .15rem .5rem; border-radius: 999px; color: var(--muted); }
+
+    /* ── Stats ── */
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-bottom: 1.25rem; }
+    .stat-card { background: #fff; border-radius: 12px; padding: 1.1rem; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+    .stat-num { font-size: 2rem; font-weight: 700; color: var(--primary); }
+    .stat-lbl { font-size: .72rem; color: var(--muted); }
+    .section-title { font-size: .9rem; font-weight: 600; margin-bottom: .75rem; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #1E293B;
+      color: #fff;
+      padding: .6rem 1.25rem;
+      border-radius: 10px;
+      font-size: .85rem;
+      z-index: 99;
+      transition: transform .3s cubic-bezier(.4,0,.2,1);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    @media (max-width: 380px) {
+      .quiz-opts { grid-template-columns: 1fr; }
+      .fc-word { font-size: 1.6rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>📚 英単語トレーニング</h1>
+  <span class="badge" id="known-badge">0 / 0 習得</span>
+</header>
+
+<nav>
+  <button class="active" onclick="showView('flashcard')">🃏 カード</button>
+  <button onclick="showView('quiz')">🎯 クイズ</button>
+  <button onclick="showView('wordlist')">📖 単語帳</button>
+  <button onclick="showView('stats')">📊 統計</button>
+</nav>
+
+<main>
+
+  <!-- ══════════ FLASHCARD ══════════ -->
+  <div id="view-flashcard" class="view active">
+    <div class="fc-toolbar">
+      <select id="fc-cat" onchange="initDeck()">
+        <option value="all">全カテゴリ</option>
+      </select>
+      <select id="fc-status" onchange="initDeck()">
+        <option value="all">全単語</option>
+        <option value="unknown">未習得のみ</option>
+        <option value="known">習得済みのみ</option>
+      </select>
+      <button class="btn btn-secondary btn-icon" onclick="shuffleDeck()" title="シャッフル">🔀</button>
+    </div>
+
+    <div class="prog-wrap"><div class="prog-bar" id="fc-prog" style="width:0%"></div></div>
+    <div class="fc-counter" id="fc-cnt">0 / 0</div>
+
+    <div class="fc-wrap">
+      <div class="flashcard" id="flashcard" onclick="flipCard()">
+        <div class="fc-face fc-front">
+          <div class="fc-label">English</div>
+          <div class="fc-word" id="fc-word">—</div>
+          <div class="fc-tap">タップして意味を確認</div>
+        </div>
+        <div class="fc-face fc-back">
+          <div class="fc-label">日本語</div>
+          <div class="fc-meaning" id="fc-meaning">—</div>
+          <div class="fc-cat" id="fc-cat-tag">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="fc-nav">
+      <button class="btn btn-secondary" onclick="prevCard()">← 前へ</button>
+      <button class="btn btn-primary" onclick="flipCard()">めくる</button>
+      <button class="btn btn-secondary" onclick="nextCard()">次へ →</button>
+    </div>
+
+    <div class="fc-actions">
+      <button class="btn btn-danger"  onclick="markCard(false)">✗ まだ</button>
+      <button class="btn btn-success" onclick="markCard(true)">✓ 覚えた！</button>
+    </div>
+  </div>
+
+  <!-- ══════════ QUIZ ══════════ -->
+  <div id="view-quiz" class="view">
+    <div class="quiz-scores">
+      <div class="score-box">
+        <div class="score-num" id="q-correct" style="color:var(--success)">0</div>
+        <div class="score-lbl">正解</div>
+      </div>
+      <div class="score-box">
+        <div class="score-num" id="q-wrong" style="color:var(--danger)">0</div>
+        <div class="score-lbl">不正解</div>
+      </div>
+      <div class="score-box">
+        <div class="score-num" id="q-streak" style="color:var(--warning)">0</div>
+        <div class="score-lbl">連続正解</div>
+      </div>
+    </div>
+
+    <div id="quiz-area">
+      <div class="quiz-prog-lbl" id="q-prog-lbl">1 / 10</div>
+      <div class="prog-wrap"><div class="prog-bar" id="q-prog" style="width:0%"></div></div>
+      <div class="quiz-q">
+        <div class="quiz-hint">次の単語の意味は？</div>
+        <div class="quiz-word" id="q-word">—</div>
+      </div>
+      <div class="quiz-opts" id="q-opts"></div>
+    </div>
+
+    <div class="result-panel" id="quiz-result">
+      <div class="result-emoji" id="r-emoji">🎉</div>
+      <div class="result-title" id="r-title">素晴らしい！</div>
+      <div class="result-sub"   id="r-sub"></div>
+      <button class="btn btn-primary" onclick="startQuiz()">もう一度チャレンジ</button>
+    </div>
+  </div>
+
+  <!-- ══════════ WORD LIST ══════════ -->
+  <div id="view-wordlist" class="view">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search" placeholder="英語 / 日本語で検索..." oninput="renderList()">
+    </div>
+    <div class="cat-chips" id="wl-chips"></div>
+    <div class="word-list" id="word-list"></div>
+  </div>
+
+  <!-- ══════════ STATS ══════════ -->
+  <div id="view-stats" class="view">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-num" id="s-total">0</div>
+        <div class="stat-lbl">総単語数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="s-known" style="color:var(--success)">0</div>
+        <div class="stat-lbl">習得済み</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="s-unknown" style="color:var(--danger)">0</div>
+        <div class="stat-lbl">未習得</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="s-rate">0%</div>
+        <div class="stat-lbl">習得率</div>
+      </div>
+    </div>
+    <div class="section-title">カテゴリ別進捗</div>
+    <div id="cat-stats"></div>
+    <div style="margin-top:1.5rem">
+      <button class="btn btn-danger" style="width:100%" onclick="resetAll()">🗑 進捗をリセット</button>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════
+//  単語データベース
+// ══════════════════════════════════════════
+const WORDS = [
+  // 形容詞
+  { en:'important',     ja:'重要な',              cat:'形容詞' },
+  { en:'beautiful',     ja:'美しい',              cat:'形容詞' },
+  { en:'difficult',     ja:'難しい',              cat:'形容詞' },
+  { en:'expensive',     ja:'高価な',              cat:'形容詞' },
+  { en:'interesting',   ja:'興味深い',            cat:'形容詞' },
+  { en:'dangerous',     ja:'危険な',              cat:'形容詞' },
+  { en:'comfortable',   ja:'快適な',              cat:'形容詞' },
+  { en:'successful',    ja:'成功した',            cat:'形容詞' },
+  { en:'necessary',     ja:'必要な',              cat:'形容詞' },
+  { en:'traditional',   ja:'伝統的な',            cat:'形容詞' },
+  { en:'available',     ja:'利用可能な',          cat:'形容詞' },
+  { en:'significant',   ja:'著しい・重要な',      cat:'形容詞' },
+  { en:'appropriate',   ja:'適切な',              cat:'形容詞' },
+  { en:'efficient',     ja:'効率的な',            cat:'形容詞' },
+  { en:'reliable',      ja:'信頼できる',          cat:'形容詞' },
+  // 動詞
+  { en:'achieve',       ja:'達成する',            cat:'動詞' },
+  { en:'improve',       ja:'改善する',            cat:'動詞' },
+  { en:'require',       ja:'必要とする',          cat:'動詞' },
+  { en:'provide',       ja:'提供する',            cat:'動詞' },
+  { en:'develop',       ja:'開発する・発展する',  cat:'動詞' },
+  { en:'maintain',      ja:'維持する',            cat:'動詞' },
+  { en:'support',       ja:'支援する',            cat:'動詞' },
+  { en:'increase',      ja:'増加する',            cat:'動詞' },
+  { en:'reduce',        ja:'減らす',              cat:'動詞' },
+  { en:'create',        ja:'作る・創造する',      cat:'動詞' },
+  { en:'consider',      ja:'考慮する',            cat:'動詞' },
+  { en:'describe',      ja:'説明する・記述する',  cat:'動詞' },
+  { en:'suggest',       ja:'提案する',            cat:'動詞' },
+  { en:'negotiate',     ja:'交渉する',            cat:'動詞' },
+  { en:'organize',      ja:'整理する・組織する',  cat:'動詞' },
+  // 名詞
+  { en:'opportunity',   ja:'機会・チャンス',      cat:'名詞' },
+  { en:'environment',   ja:'環境',                cat:'名詞' },
+  { en:'experience',    ja:'経験',                cat:'名詞' },
+  { en:'relationship',  ja:'関係',                cat:'名詞' },
+  { en:'technology',    ja:'技術・テクノロジー',  cat:'名詞' },
+  { en:'communication', ja:'コミュニケーション',  cat:'名詞' },
+  { en:'responsibility',ja:'責任',                cat:'名詞' },
+  { en:'performance',   ja:'業績・パフォーマンス',cat:'名詞' },
+  { en:'achievement',   ja:'達成・業績',          cat:'名詞' },
+  { en:'competition',   ja:'競争・競技',          cat:'名詞' },
+  { en:'strategy',      ja:'戦略',                cat:'名詞' },
+  { en:'investment',    ja:'投資',                cat:'名詞' },
+  { en:'customer',      ja:'顧客',                cat:'名詞' },
+  { en:'department',    ja:'部門・部署',          cat:'名詞' },
+  { en:'solution',      ja:'解決策',              cat:'名詞' },
+  // 副詞
+  { en:'quickly',       ja:'素早く',              cat:'副詞' },
+  { en:'suddenly',      ja:'突然',                cat:'副詞' },
+  { en:'carefully',     ja:'注意深く',            cat:'副詞' },
+  { en:'recently',      ja:'最近',                cat:'副詞' },
+  { en:'especially',    ja:'特に',                cat:'副詞' },
+  { en:'completely',    ja:'完全に',              cat:'副詞' },
+  { en:'significantly', ja:'著しく・かなり',      cat:'副詞' },
+  { en:'frequently',    ja:'頻繁に',              cat:'副詞' },
+  { en:'immediately',   ja:'すぐに',              cat:'副詞' },
+  { en:'approximately', ja:'およそ・約',          cat:'副詞' },
+  // 接続詞
+  { en:'therefore',     ja:'したがって',          cat:'接続詞' },
+  { en:'however',       ja:'しかしながら',        cat:'接続詞' },
+  { en:'although',      ja:'〜だけれども',        cat:'接続詞' },
+  { en:'meanwhile',     ja:'一方で・その間',      cat:'接続詞' },
+  { en:'furthermore',   ja:'さらに',              cat:'接続詞' },
+  { en:'nevertheless',  ja:'それにもかかわらず',  cat:'接続詞' },
+];
+
+const QUIZ_LEN = 10;
+
+// ══════════════════════════════════════════
+//  State
+// ══════════════════════════════════════════
+let known     = JSON.parse(localStorage.getItem('known') || '{}');
+let deck      = [];
+let deckIdx   = 0;
+let flipped   = false;
+let wlCat     = 'all';
+
+let qCorrect  = 0;
+let qWrong    = 0;
+let qStreak   = 0;
+let qCount    = 0;
+let qQueue    = [];
+let qAnswered = false;
+let qCorrectJa= '';
+
+// ══════════════════════════════════════════
+//  Utilities
+// ══════════════════════════════════════════
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+function save() {
+  localStorage.setItem('known', JSON.stringify(known));
+  updateBadge();
+}
+
+function updateBadge() {
+  const n = Object.values(known).filter(Boolean).length;
+  document.getElementById('known-badge').textContent = `${n} / ${WORDS.length} 習得`;
+}
+
+function categories() {
+  return [...new Set(WORDS.map(w => w.cat))];
+}
+
+// ══════════════════════════════════════════
+//  Navigation
+// ══════════════════════════════════════════
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  const idx = ['flashcard','quiz','wordlist','stats'].indexOf(name);
+  document.querySelectorAll('nav button')[idx].classList.add('active');
+  if (name === 'wordlist') renderList();
+  if (name === 'stats') renderStats();
+  if (name === 'quiz') startQuiz();
+}
+
+// ══════════════════════════════════════════
+//  Flashcard
+// ══════════════════════════════════════════
+function populateCatSelect() {
+  const sel = document.getElementById('fc-cat');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="all">全カテゴリ</option>';
+  categories().forEach(c => {
+    const o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    if (c === cur) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
+function initDeck() {
+  const cat    = document.getElementById('fc-cat').value;
+  const status = document.getElementById('fc-status').value;
+  let pool = WORDS.filter(w => cat === 'all' || w.cat === cat);
+  if (status === 'unknown') pool = pool.filter(w => !known[w.en]);
+  if (status === 'known')   pool = pool.filter(w =>  known[w.en]);
+  deck = shuffle(pool);
+  deckIdx = 0;
+  renderCard();
+}
+
+function shuffleDeck() {
+  initDeck();
+  toast('🔀 シャッフルしました');
+}
+
+function renderCard() {
+  const card = document.getElementById('flashcard');
+  card.classList.remove('flipped');
+  flipped = false;
+
+  if (!deck.length) {
+    document.getElementById('fc-word').textContent = '該当なし';
+    document.getElementById('fc-meaning').textContent = '—';
+    document.getElementById('fc-cat-tag').textContent = '—';
+    document.getElementById('fc-cnt').textContent = '0 / 0';
+    document.getElementById('fc-prog').style.width = '0%';
+    return;
+  }
+
+  const w = deck[deckIdx];
+  document.getElementById('fc-word').textContent    = w.en;
+  document.getElementById('fc-meaning').textContent = w.ja;
+  document.getElementById('fc-cat-tag').textContent = w.cat;
+  document.getElementById('fc-cnt').textContent     = `${deckIdx + 1} / ${deck.length}`;
+  document.getElementById('fc-prog').style.width    = `${((deckIdx + 1) / deck.length) * 100}%`;
+}
+
+function flipCard() {
+  flipped = !flipped;
+  document.getElementById('flashcard').classList.toggle('flipped', flipped);
+}
+
+function nextCard() {
+  if (!deck.length) return;
+  deckIdx = (deckIdx + 1) % deck.length;
+  renderCard();
+}
+
+function prevCard() {
+  if (!deck.length) return;
+  deckIdx = (deckIdx - 1 + deck.length) % deck.length;
+  renderCard();
+}
+
+function markCard(isKnown) {
+  if (!deck.length) return;
+  const w = deck[deckIdx];
+  known[w.en] = isKnown;
+  save();
+  toast(isKnown ? '✓ 覚えた！' : '📝 後でもう一度');
+  nextCard();
+}
+
+// ══════════════════════════════════════════
+//  Quiz
+// ══════════════════════════════════════════
+function startQuiz() {
+  qCorrect = qWrong = qStreak = qCount = 0;
+  qQueue = shuffle(WORDS).slice(0, QUIZ_LEN);
+  document.getElementById('quiz-result').classList.remove('show');
+  document.getElementById('quiz-area').style.display = 'block';
+  updateQScore();
+  nextQuestion();
+}
+
+function updateQScore() {
+  document.getElementById('q-correct').textContent = qCorrect;
+  document.getElementById('q-wrong').textContent   = qWrong;
+  document.getElementById('q-streak').textContent  = qStreak;
+}
+
+function nextQuestion() {
+  if (qCount >= QUIZ_LEN) { showResult(); return; }
+
+  qAnswered = false;
+  const correct = qQueue[qCount];
+  const others  = shuffle(WORDS.filter(w => w.en !== correct.en)).slice(0, 3);
+  const opts    = shuffle([correct, ...others]);
+  qCorrectJa    = correct.ja;
+
+  document.getElementById('q-word').textContent = correct.en;
+  document.getElementById('q-prog-lbl').textContent = `${qCount + 1} / ${QUIZ_LEN}`;
+  document.getElementById('q-prog').style.width = `${(qCount / QUIZ_LEN) * 100}%`;
+
+  const container = document.getElementById('q-opts');
+  container.innerHTML = '';
+  opts.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'quiz-opt';
+    btn.textContent = opt.ja;
+    btn.onclick = () => answerQuiz(btn, opt.en === correct.en);
+    container.appendChild(btn);
+  });
+}
+
+function answerQuiz(btn, isCorrect) {
+  if (qAnswered) return;
+  qAnswered = true;
+  qCount++;
+
+  const allBtns = document.querySelectorAll('.quiz-opt');
+  allBtns.forEach(b => {
+    b.classList.add('disabled');
+    if (b.textContent === qCorrectJa) b.classList.add('correct');
+  });
+
+  if (isCorrect) {
+    qCorrect++; qStreak++;
+    toast('正解！🎉');
+  } else {
+    btn.classList.add('wrong');
+    qWrong++; qStreak = 0;
+    toast('不正解...');
+  }
+
+  updateQScore();
+  document.getElementById('q-prog').style.width = `${(qCount / QUIZ_LEN) * 100}%`;
+  document.getElementById('q-prog-lbl').textContent = `${qCount} / ${QUIZ_LEN}`;
+  setTimeout(nextQuestion, 1300);
+}
+
+function showResult() {
+  document.getElementById('quiz-area').style.display = 'none';
+  document.getElementById('quiz-result').classList.add('show');
+  const rate = Math.round((qCorrect / QUIZ_LEN) * 100);
+  const [emoji, title] =
+    rate >= 90 ? ['🏆','完璧！'] :
+    rate >= 70 ? ['🎉','素晴らしい！'] :
+    rate >= 50 ? ['👍','まあまあ！'] :
+                 ['📚','もっと練習しよう！'];
+  document.getElementById('r-emoji').textContent = emoji;
+  document.getElementById('r-title').textContent = title;
+  document.getElementById('r-sub').textContent   = `${qCorrect} / ${QUIZ_LEN} 正解（正答率 ${rate}%）`;
+}
+
+// ══════════════════════════════════════════
+//  Word List
+// ══════════════════════════════════════════
+function renderList() {
+  const q = (document.getElementById('search').value || '').toLowerCase();
+
+  // chips
+  const chips = document.getElementById('wl-chips');
+  chips.innerHTML = '';
+  ['all', ...categories()].forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'chip' + (c === wlCat ? ' active' : '');
+    btn.textContent = c === 'all' ? 'すべて' : c;
+    btn.onclick = () => { wlCat = c; renderList(); };
+    chips.appendChild(btn);
+  });
+
+  const filtered = WORDS.filter(w => {
+    const matchCat  = wlCat === 'all' || w.cat === wlCat;
+    const matchText = !q || w.en.toLowerCase().includes(q) || w.ja.includes(q);
+    return matchCat && matchText;
+  });
+
+  const list = document.getElementById('word-list');
+  list.innerHTML = '';
+  filtered.forEach(w => {
+    const isKnown = known[w.en];
+    const div = document.createElement('div');
+    div.className = 'word-item';
+    div.innerHTML = `
+      <div class="dot ${isKnown ? 'known' : 'unknown'}"></div>
+      <div class="word-en">${w.en}</div>
+      <div class="word-ja">${w.ja}</div>
+      <div class="word-tag">${w.cat}</div>
+    `;
+    list.appendChild(div);
+  });
+
+  if (!filtered.length) {
+    list.innerHTML = '<p style="text-align:center;color:var(--muted);padding:2rem 0">該当する単語がありません</p>';
+  }
+}
+
+// ══════════════════════════════════════════
+//  Stats
+// ══════════════════════════════════════════
+function renderStats() {
+  const n     = Object.values(known).filter(Boolean).length;
+  const total = WORDS.length;
+  const rate  = total ? Math.round((n / total) * 100) : 0;
+
+  document.getElementById('s-total').textContent   = total;
+  document.getElementById('s-known').textContent   = n;
+  document.getElementById('s-unknown').textContent = total - n;
+  document.getElementById('s-rate').textContent    = rate + '%';
+
+  const container = document.getElementById('cat-stats');
+  container.innerHTML = '';
+  categories().forEach(cat => {
+    const catWords = WORDS.filter(w => w.cat === cat);
+    const catKnown = catWords.filter(w => known[w.en]).length;
+    const r = Math.round((catKnown / catWords.length) * 100);
+    const div = document.createElement('div');
+    div.style.marginBottom = '.875rem';
+    div.innerHTML = `
+      <div style="display:flex;justify-content:space-between;margin-bottom:.25rem;font-size:.8rem">
+        <span>${cat}</span>
+        <span style="color:var(--muted)">${catKnown} / ${catWords.length}</span>
+      </div>
+      <div class="prog-wrap"><div class="prog-bar" style="width:${r}%"></div></div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function resetAll() {
+  if (!confirm('すべての進捗をリセットしますか？')) return;
+  known = {};
+  save();
+  renderStats();
+  toast('🗑 リセットしました');
+}
+
+// ══════════════════════════════════════════
+//  Init
+// ══════════════════════════════════════════
+populateCatSelect();
+initDeck();
+updateBadge();
+</script>
+</body>
+</html>
