@@ -291,27 +291,26 @@ function saveReview() {
 }
 
 function scheduleReview(wordEn) {
-  const existing = reviewSchedule[wordEn];
-  const now = Date.now();
-  if (!existing) {
-    reviewSchedule[wordEn] = { stage: 1, nextReview: now + 3 * DAY_MS };
-  } else if (existing.stage === 1) {
-    reviewSchedule[wordEn] = { stage: 2, nextReview: now + 7 * DAY_MS };
-  } else {
-    reviewSchedule[wordEn] = { stage: 1, nextReview: now + 3 * DAY_MS };
+  if (!reviewSchedule[wordEn]) {
+    // 初回の間違い：すぐ復習できるよう nextReview を今に設定
+    reviewSchedule[wordEn] = { stage: 1, nextReview: Date.now() };
   }
+  // すでにスケジュール済みの場合は上書きしない（既存スケジュールを尊重）
   saveReview();
 }
 
 function completeReview(wordEn) {
   const existing = reviewSchedule[wordEn];
   if (!existing) return;
-  if (existing.stage >= 2) {
-    delete reviewSchedule[wordEn];
-    toast('🎓 復習完了！');
+  if (existing.stage === 1) {
+    reviewSchedule[wordEn] = { stage: 2, nextReview: Date.now() + 3 * DAY_MS };
+    toast('✓ 3日後に再復習');
+  } else if (existing.stage === 2) {
+    reviewSchedule[wordEn] = { stage: 3, nextReview: Date.now() + 7 * DAY_MS };
+    toast('✓ 7日後に再復習');
   } else {
-    reviewSchedule[wordEn] = { stage: 2, nextReview: Date.now() + 7 * DAY_MS };
-    toast('✓ 次は7日後に復習');
+    delete reviewSchedule[wordEn];
+    toast('🎓 完全習得！');
   }
   saveReview();
 }
@@ -422,7 +421,16 @@ function markCard(isKnown) {
   const w = deck[deckIdx];
   known[w.en] = isKnown;
   save();
-  toast(isKnown ? '✓ 覚えた！' : '📝 後でもう一度');
+  const inReview = document.getElementById('fc-status').value === 'review';
+  if (inReview && reviewSchedule[w.en]) {
+    if (isKnown) {
+      completeReview(w.en); // toast はcompleteReview内で出す
+    } else {
+      toast('📝 もう一度復習しよう');
+    }
+  } else {
+    toast(isKnown ? '✓ 覚えた！' : '📝 後でもう一度');
+  }
   nextCard();
 }
 
@@ -472,7 +480,7 @@ function answerQuiz(btn, isCorrect) {
     if (b.textContent === qCorrectJa) b.classList.add('correct');
   });
   if (isCorrect) { qCorrect++; qStreak++; toast('正解！🎉'); }
-  else { btn.classList.add('wrong'); qWrong++; qStreak = 0; toast('不正解... 3日後に復習📅'); scheduleReview(qQueue[qCount-1].en); }
+  else { btn.classList.add('wrong'); qWrong++; qStreak = 0; toast('不正解... 復習に追加📝'); scheduleReview(qQueue[qCount-1].en); }
   updateQScore();
   document.getElementById('q-prog').style.width = `${(qCount/QUIZ_LEN)*100}%`;
   document.getElementById('q-prog-lbl').textContent = `${qCount} / ${QUIZ_LEN}`;
