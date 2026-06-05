@@ -55,6 +55,8 @@
     .fc-meaning { font-size: 1.35rem; font-weight: 700; text-align: center; margin-bottom: .4rem; }
     .fc-cat { font-size: .72rem; color: var(--muted); background: var(--bg); padding: .2rem .6rem; border-radius: 999px; margin-bottom: .5rem; }
     .fc-root { font-size: .7rem; color: #94a3b8; text-align: center; max-width: 280px; line-height: 1.5; margin-top: .25rem; }
+    .fc-ex { font-size: .72rem; color: #475569; text-align: center; max-width: 300px; line-height: 1.6; margin-top: .4rem; border-top: 1px solid var(--border); padding-top: .4rem; font-style: italic; }
+    .rev-badge { background: var(--danger); color: #fff; font-size: .58rem; padding: .08rem .3rem; border-radius: 999px; margin-left: .15rem; vertical-align: super; line-height: 1; }
     .fc-tap { font-size: .78rem; opacity: .7; margin-top: .75rem; }
     .fc-nav { display: flex; justify-content: center; gap: .75rem; margin-bottom: .75rem; }
     .fc-actions { display: flex; justify-content: center; gap: 1rem; }
@@ -128,7 +130,7 @@
 
 <nav>
   <button class="active" onclick="showView('flashcard')">🃏 カード</button>
-  <button onclick="showView('quiz')">🎯 クイズ</button>
+  <button onclick="showView('quiz')">🎯 クイズ<span class="rev-badge" id="rev-badge" style="display:none">0</span></button>
   <button onclick="showView('wordlist')">📖 単語帳</button>
   <button onclick="showView('stats')">📊 統計</button>
 </nav>
@@ -150,6 +152,7 @@
         <option value="all">全単語</option>
         <option value="unknown">未習得のみ</option>
         <option value="known">習得済み</option>
+        <option value="review">復習のみ</option>
       </select>
       <button class="btn btn-secondary btn-icon" onclick="shuffleDeck()" title="シャッフル">🔀</button>
     </div>
@@ -170,6 +173,7 @@
           <div class="fc-meaning" id="fc-meaning">—</div>
           <div class="fc-cat" id="fc-cat-tag">—</div>
           <div class="fc-root" id="fc-root">—</div>
+          <div class="fc-ex" id="fc-ex" style="display:none"></div>
         </div>
       </div>
     </div>
@@ -231,6 +235,10 @@
       <div class="stat-card"><div class="stat-num" id="s-c1" style="color:#1d4ed8">0</div><div class="stat-lbl">C1 習得</div></div>
       <div class="stat-card"><div class="stat-num" id="s-c2" style="color:#be185d">0</div><div class="stat-lbl">C2 習得</div></div>
     </div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-num" id="s-review-due" style="color:var(--danger)">0</div><div class="stat-lbl">本日の復習</div></div>
+      <div class="stat-card"><div class="stat-num" id="s-review-total" style="color:var(--warning)">0</div><div class="stat-lbl">復習スケジュール中</div></div>
+    </div>
     <div class="section-title">カテゴリ別進捗</div>
     <div id="cat-stats"></div>
     <div style="margin-top:1.5rem">
@@ -243,9 +251,12 @@
 <div class="toast" id="toast"></div>
 
 <script src="words.js"></script>
+<script src="examples.js"></script>
 <script>
 const QUIZ_LEN = 10;
+const DAY_MS = 86400000;
 let known = JSON.parse(localStorage.getItem('known') || '{}');
+let reviewSchedule = JSON.parse(localStorage.getItem('reviewSchedule') || '{}');
 let deck = [], deckIdx = 0, flipped = false;
 let wlCat = 'all', wlLv = 'all';
 let qCorrect = 0, qWrong = 0, qStreak = 0, qCount = 0;
@@ -272,6 +283,51 @@ function toast(msg) {
 function save() {
   localStorage.setItem('known', JSON.stringify(known));
   updateBadge();
+}
+
+function saveReview() {
+  localStorage.setItem('reviewSchedule', JSON.stringify(reviewSchedule));
+  updateReviewBadge();
+}
+
+function scheduleReview(wordEn) {
+  const existing = reviewSchedule[wordEn];
+  const now = Date.now();
+  if (!existing) {
+    reviewSchedule[wordEn] = { stage: 1, nextReview: now + 3 * DAY_MS };
+  } else if (existing.stage === 1) {
+    reviewSchedule[wordEn] = { stage: 2, nextReview: now + 7 * DAY_MS };
+  } else {
+    reviewSchedule[wordEn] = { stage: 1, nextReview: now + 3 * DAY_MS };
+  }
+  saveReview();
+}
+
+function completeReview(wordEn) {
+  const existing = reviewSchedule[wordEn];
+  if (!existing) return;
+  if (existing.stage >= 2) {
+    delete reviewSchedule[wordEn];
+    toast('🎓 復習完了！');
+  } else {
+    reviewSchedule[wordEn] = { stage: 2, nextReview: Date.now() + 7 * DAY_MS };
+    toast('✓ 次は7日後に復習');
+  }
+  saveReview();
+}
+
+function getReviewWords() {
+  const now = Date.now();
+  return WORDS.filter(w => {
+    const e = reviewSchedule[w.en];
+    return e && e.nextReview <= now;
+  });
+}
+
+function updateReviewBadge() {
+  const count = getReviewWords().length;
+  const badge = document.getElementById('rev-badge');
+  if (badge) { badge.textContent = count; badge.style.display = count > 0 ? 'inline' : 'none'; }
 }
 
 function updateBadge() {
@@ -316,7 +372,8 @@ function initDeck() {
     (lv  === 'all' || w.lv  === lv)
   );
   if (status === 'unknown') pool = pool.filter(w => !known[w.en]);
-  if (status === 'known')   pool = pool.filter(w =>  known[w.en]);
+  else if (status === 'known') pool = pool.filter(w => known[w.en]);
+  else if (status === 'review') pool = getReviewWords();
   deck = shuffle(pool);
   deckIdx = 0;
   renderCard();
@@ -344,6 +401,10 @@ function renderCard() {
   document.getElementById('fc-cat-tag').textContent = w.cat;
   document.getElementById('fc-root').textContent    = w.root;
   document.getElementById('fc-lv-tag').textContent  = w.lv;
+  const exEl = document.getElementById('fc-ex');
+  const exText = (typeof EXAMPLES !== 'undefined' && EXAMPLES[w.en]) ? EXAMPLES[w.en] : '';
+  exEl.textContent = exText;
+  exEl.style.display = exText ? 'block' : 'none';
   document.getElementById('fc-cnt').textContent     = `${deckIdx+1} / ${deck.length}`;
   document.getElementById('fc-prog').style.width    = `${((deckIdx+1)/deck.length)*100}%`;
 }
@@ -411,7 +472,7 @@ function answerQuiz(btn, isCorrect) {
     if (b.textContent === qCorrectJa) b.classList.add('correct');
   });
   if (isCorrect) { qCorrect++; qStreak++; toast('正解！🎉'); }
-  else { btn.classList.add('wrong'); qWrong++; qStreak = 0; toast('不正解...'); }
+  else { btn.classList.add('wrong'); qWrong++; qStreak = 0; toast('不正解... 3日後に復習📅'); scheduleReview(qQueue[qCount-1].en); }
   updateQScore();
   document.getElementById('q-prog').style.width = `${(qCount/QUIZ_LEN)*100}%`;
   document.getElementById('q-prog-lbl').textContent = `${qCount} / ${QUIZ_LEN}`;
@@ -499,8 +560,18 @@ function renderList() {
           rootEl.textContent = '🌱 ' + w.root;
           div.appendChild(rootEl);
         }
+        let exEl2 = div.querySelector('.word-ex-text');
+        if (!exEl2 && typeof EXAMPLES !== 'undefined' && EXAMPLES[w.en]) {
+          exEl2 = document.createElement('div');
+          exEl2.className = 'word-root-text word-ex-text';
+          exEl2.style.fontStyle = 'italic';
+          exEl2.textContent = '📝 ' + EXAMPLES[w.en];
+          div.appendChild(exEl2);
+        }
       } else {
         if (rootEl) rootEl.remove();
+        const exEl2 = div.querySelector('.word-ex-text');
+        if (exEl2) exEl2.remove();
       }
     });
     list.appendChild(div);
@@ -524,6 +595,11 @@ function renderStats() {
   document.getElementById('s-c1').textContent = `${c1Known}/${c1Words.length}`;
   document.getElementById('s-c2').textContent = `${c2Known}/${c2Words.length}`;
 
+  const dueCount = getReviewWords().length;
+  const totalScheduled = Object.keys(reviewSchedule).length;
+  document.getElementById('s-review-due').textContent   = dueCount;
+  document.getElementById('s-review-total').textContent = totalScheduled;
+
   const container = document.getElementById('cat-stats');
   container.innerHTML = '';
   categories().forEach(cat => {
@@ -545,7 +621,9 @@ function renderStats() {
 function resetAll() {
   if (!confirm('すべての進捗をリセットしますか？')) return;
   known = {};
+  reviewSchedule = {};
   save();
+  saveReview();
   renderStats();
   toast('🗑 リセットしました');
 }
@@ -554,6 +632,7 @@ function resetAll() {
 populateCatSelect();
 initDeck();
 updateBadge();
+updateReviewBadge();
 </script>
 </body>
 </html>
